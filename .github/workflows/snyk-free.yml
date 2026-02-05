@@ -1,15 +1,16 @@
+
 name: Snyk (Free) - SCA / SAST / Secrets / IaC / Container
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
   workflow_dispatch:
 
 permissions:
   contents: read
-  security-events: write   # SARIF を GitHub Code Scanning にアップロード
+  security-events: write
 
 concurrency:
   group: snyk-free-${{ github.ref }}
@@ -18,31 +19,30 @@ concurrency:
 jobs:
   snyk-free:
     runs-on: ubuntu-latest
-
     steps:
-      # 1) コード取得
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 2) Snyk CLI セットアップ（公式アクション）
       - name: Setup Snyk CLI
-        uses: snyk/actions/setup@master
+        uses: snyk/actions/setup@v4
 
-      # 3) Python セットアップ（Gradio 想定）
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
-      # 4) （任意）依存性を入れておくと再現性が上がる
       - name: Install app dependencies (optional)
         if: ${{ hashFiles('requirements.txt') != '' }}
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # === ② SCA（依存関係）===
-      # Free: 200 tests/月。結果をSARIFに出し、ビルドは落とさず継続（まずは可視化重視）
+      - name: Snyk auth
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: snyk auth $SNYK_TOKEN
+
+      # === SCA ===
       - name: Snyk Open Source (SCA)
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
@@ -50,11 +50,9 @@ jobs:
         run: |
           snyk test --file=requirements.txt --package-manager=pip \
             --sarif-file-output=snyk-sca.sarif
-          # 継続監視したい場合は monitor も（ダッシュボードにスナップショット送信）
           snyk monitor --file=requirements.txt --package-manager=pip
 
-      # === ③ SAST + ① Secrets（Snyk Codeに含まれる）===
-      # Free: 100 tests/月。--report でダッシュボードに結果送信可
+      # === SAST + Secrets ===
       - name: Snyk Code (SAST + Secrets)
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
@@ -62,7 +60,7 @@ jobs:
         run: |
           snyk code test --report --sarif-file-output=snyk-code.sarif
 
-      # === ⑤ IaC ===
+      # === IaC ===
       - name: Snyk IaC (Terraform / K8s / CFN configs)
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
@@ -70,8 +68,7 @@ jobs:
         run: |
           snyk iac test --sarif-file-output=snyk-iac.sarif
 
-      # === ⑥ コンテナ ===
-      # Dockerfile がある時だけ実行
+      # === Container ===
       - name: Build Container (only if Dockerfile exists)
         if: ${{ hashFiles('Dockerfile') != '' }}
         run: docker build -t app:latest .
@@ -84,10 +81,9 @@ jobs:
         run: |
           snyk container test app:latest --file=Dockerfile \
             --sarif-file-output=snyk-container.sarif
-          # 継続監視したい場合
           snyk container monitor app:latest --file=Dockerfile
 
-      # === SARIF を GitHub Code Scanning にアップロード（PR上で閲覧可能）===
+      # === Upload SARIF ===
       - name: Upload SARIF (SCA)
         if: ${{ always() && hashFiles('snyk-sca.sarif') != '' }}
         uses: github/codeql-action/upload-sarif@v3
