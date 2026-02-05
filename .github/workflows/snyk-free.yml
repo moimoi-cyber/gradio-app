@@ -87,28 +87,28 @@ jobs:
       # === Upload SARIF ===
       - name: Upload SARIF (SCA)
         if: ${{ always() && hashFiles('snyk-sca.sarif') != '' }}
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: snyk-sca.sarif
           category: snyk-sca
 
       - name: Upload SARIF (Code)
         if: ${{ always() && hashFiles('snyk-code.sarif') != '' }}
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: snyk-code.sarif
           category: snyk-code
 
       - name: Upload SARIF (IaC)
         if: ${{ always() && hashFiles('snyk-iac.sarif') != '' }}
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: snyk-iac.sarif
           category: snyk-iac
 
       - name: Upload SARIF (Container)
         if: ${{ always() && hashFiles('snyk-container.sarif') != '' }}
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: snyk-container.sarif
           category: snyk-container
