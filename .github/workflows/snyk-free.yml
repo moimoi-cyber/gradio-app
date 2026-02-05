@@ -1,18 +1,20 @@
-
 name: Snyk (Free) - SCA / SAST / Secrets / IaC / Container
 
+# --- どんな時にこのワークフローを動かすか ---
 on:
   push:
-    branches: ["main"]
+    branches: ["main"]       # main ブランチへの push 時に実行
   pull_request:
-    branches: ["main"]
-  workflow_dispatch:
+    branches: ["main"]       # main ブランチ宛ての PR で実行
+  workflow_dispatch:          # 手動実行も許可（Run workflow ボタン）
 
+# --- GitHub の GITHUB_TOKEN の権限設定 ---
 permissions:
-  contents: read
-  security-events: write
-  actions: read
+  contents: read              # リポジトリのコード取得に必要
+  security-events: write      # SARIF (解析結果) を GitHub Security へアップロードするために必須
+  actions: read               # 一部の Snyk テレメトリ処理で必要
 
+# --- 同一ブランチで複数ワークフローが走らないように制御 ---
 concurrency:
   group: snyk-free-${{ github.ref }}
   cancel-in-progress: true
@@ -20,48 +22,80 @@ concurrency:
 jobs:
   snyk-free:
     runs-on: ubuntu-latest
+
     steps:
+      # --------------------------------------------
+      # ① リポジトリのコードを取得
+      # --------------------------------------------
       - name: Checkout
         uses: actions/checkout@v4
 
+      # --------------------------------------------
+      # ② Snyk CLI をインストール（公式推奨の setup アクション）
+      # --------------------------------------------
       - name: Setup Snyk CLI
         uses: snyk/actions/setup@master
 
+      # --------------------------------------------
+      # ③ Python のセットアップ（requirements.txt の解析に必要）
+      # --------------------------------------------
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
+      # --------------------------------------------
+      # ④ Python 依存関係をインストール（requirements.txt がある時だけ）
+      # --------------------------------------------
       - name: Install app dependencies (optional)
         if: ${{ hashFiles('requirements.txt') != '' }}
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      # --------------------------------------------
+      # ⑤ Snyk 認証（SNYK_TOKEN を CLI に渡す）
+      # --------------------------------------------
       - name: Snyk auth
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: snyk auth $SNYK_TOKEN
 
-      # === SCA ===
+      # --------------------------------------------
+      # ⑥ SCA（Open Source / 依存関係の脆弱性）
+      #     ・snyk test      → CI 上でのチェック（exit code が返る）
+      #     ・snyk monitor   → Snyk Web UI に結果を送信（継続監視用）
+      #     ・SARIF 出力     → GitHub Security (Code scanning) に表示
+      # --------------------------------------------
       - name: Snyk Open Source (SCA)
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        continue-on-error: true
+        continue-on-error: true     # 脆弱性があっても CI は成功扱いにする
         run: |
           snyk test --file=requirements.txt --package-manager=pip \
             --sarif-file-output=snyk-sca.sarif
+
+          # Snyk UI に依存関係のスナップショットを送信
           snyk monitor --file=requirements.txt --package-manager=pip
 
-      # === SAST + Secrets ===
+      # --------------------------------------------
+      # ⑦ SAST + Secrets（Snyk Code）
+      #     ・--report       → Snyk UI に結果を送信
+      #     ・SARIF 出力     → GitHub Security に表示
+      # --------------------------------------------
       - name: Snyk Code (SAST + Secrets)
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         continue-on-error: true
         run: |
-          snyk code test --report --sarif-file-output=snyk-code.sarif
+          snyk code test \
+            --report \                     # Snyk Web UI に公開
+            --project-name="${{ github.repository }} (Code)" \
+            --sarif-file-output=snyk-code.sarif
 
-      # === IaC ===
+      # --------------------------------------------
+      # ⑧ IaC（Terraform / Kubernetes / CloudFormation）
+      # --------------------------------------------
       - name: Snyk IaC (Terraform / K8s / CFN configs)
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
@@ -69,7 +103,9 @@ jobs:
         run: |
           snyk iac test --sarif-file-output=snyk-iac.sarif
 
-      # === Container ===
+      # --------------------------------------------
+      # ⑨ Docker コンテナスキャン（Dockerfileがある時だけ）
+      # --------------------------------------------
       - name: Build Container (only if Dockerfile exists)
         if: ${{ hashFiles('Dockerfile') != '' }}
         run: docker build -t app:latest .
@@ -82,9 +118,15 @@ jobs:
         run: |
           snyk container test app:latest --file=Dockerfile \
             --sarif-file-output=snyk-container.sarif
+
+          # Snyk UI へ継続監視プロジェクトを送信
           snyk container monitor app:latest --file=Dockerfile
 
-      # === Upload SARIF ===
+      # --------------------------------------------
+      # ⑩ GitHub Security (Code scanning) に SARIF をアップロード
+      #     → Security → Code scanning alerts に可視化される
+      # --------------------------------------------
+
       - name: Upload SARIF (SCA)
         if: ${{ always() && hashFiles('snyk-sca.sarif') != '' }}
         uses: github/codeql-action/upload-sarif@v4
