@@ -24,21 +24,7 @@ jobs:
   oss:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4   # リポジトリのコードを取得.
-      
-     # ▼▼▼ ここに追加 ▼▼▼
-      - name: Debug: Show current directory and list files
-        run: |
-          echo "### Current directory"
-          pwd
-          echo "### List files"
-          ls -al
-
-      - name: Debug: Show requirements.txt content
-        if: ${{ hashFiles('requirements.txt') != '' }}
-        run: |
-          echo "### requirements.txt content"
-          cat requirements.txt
+      - uses: actions/checkout@v4   # リポジトリのコードを取得
 
       - name: Run Snyk to check for vulnerabilities
         uses: snyk/actions/python@master
