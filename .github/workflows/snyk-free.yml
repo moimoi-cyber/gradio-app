@@ -1,4 +1,3 @@
-
 name: Snyk Security Suite
 
 on:
@@ -16,36 +15,37 @@ permissions:
 
 jobs:
 
- # ==========================================================
- # 1) Snyk Open Source（SCA: ライブラリ脆弱性チェック）
- # ==========================================================
- oss:
-   runs-on: ubuntu-latest
-   steps:
-     - uses: actions/checkout@v4   # リポジトリのコードを取得
- 
-     # Python 3.10 を使用し、pip キャッシュを有効化（Gradio想定）
-     - uses: actions/setup-python@v5
-       with:
-         python-version: "3.10"
-         cache: "pip"
- 
-     # requirements.txt がある場合のみ依存をインストール
-     - name: Install dependencies (optional)
-       if: hashFiles('requirements*.txt') != ''
-       run: pip install -r requirements.txt
- 
-     - uses: snyk/actions/python@master
-       env:
-         SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-       with:
-         # High以上の脆弱性はPRを停止
-         args: "--sarif-file-output=snyk-oss.sarif --severity-threshold=high"
- 
-     - uses: github/codeql-action/upload-sarif@v4
-       with:
-         sarif_file: snyk-oss.sarif
-         category: snyk-sca   # 結果分類のためのラベル
+  # ==========================================================
+  # 1) Snyk Open Source（SCA: ライブラリ脆弱性チェック）
+  # ==========================================================
+  oss:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4   # リポジトリのコードを取得
+
+      # Python 3.10 を使用し、pip キャッシュを有効化（Gradio想定）
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "pip"
+
+      # requirements.txt がある場合のみ依存をインストール
+      - name: Install dependencies (optional)
+        if: hashFiles('requirements*.txt') != ''
+        run: pip install -r requirements.txt
+
+      - uses: snyk/actions/python@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          # High以上の脆弱性はPRを停止
+          args: "--sarif-file-output=snyk-oss.sarif --severity-threshold=high"
+
+      - uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: snyk-oss.sarif
+          category: snyk-sca   # 結果分類のためのラベル
+
 
   # ==========================================================
   # 2) Snyk Code（SAST: ソースコードの脆弱性チェック）
@@ -83,69 +83,3 @@ jobs:
   #     # args: の --file= にはDockerfileのパスを書く
   #     - uses: snyk/actions/docker@master
   #       env:
-  #         SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-  #       with:
-  #         image: myapp:latest                   # ←イメージ名を入力
-  #         args: "--file=Dockerfile --sarif-file-output=snyk-container.sarif --severity-threshold=high"  # High以上の脆弱性があれば停止
-  #
-  #     - uses: github/codeql-action/upload-sarif@v4
-  #       with:
-  #         sarif_file: snyk-container.sarif
-  #         category: snyk-container   # 結果分類のためのラベル
-
-
-  # ==========================================================
-  # 4) Snyk IaC（Terraformなどの設定ファイルのチェック）
-  #    ※ いまはTerraform等のIaCがない前提で一旦オフ
-  # ==========================================================
-  # iac:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #
-  #     # file: に診断対象のフォルダ（またはファイル）を指定
-  #     - uses: snyk/actions/iac@master
-  #       env:
-  #         SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-  #       with:
-  #         file: infra/terraform                   # ←必要に応じて変更
-  #         args: "--sarif-file-output=snyk-iac.sarif --severity-threshold=high"   # High以上の脆弱性があれば停止
-  #
-  #     - uses: github/codeql-action/upload-sarif@v4
-  #       with:
-  #         sarif_file: snyk-iac.sarif
-  #         category: snyk-iac   # 結果分類のためのラベル
-
-
-  # ==========================================================
-  # 5) Snyk DAST（Probely使用）
-  #    ※ 外部SaaSの契約/設定が必要なため一旦オフ
-  # ==========================================================
-  # dast:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: Probely/probely-github-action@main
-  #       with:
-  #         api-key: ${{ secrets.PROBELY_API_KEY }}
-  #         target-id: ""    # ←ここにターゲットIDを入力
-  #         region: us       # us / eu / au から選ぶ
-
-
-  # ==========================================================
-  # 6) SBOM（ソフトウェア部品表の出力）
-  # ==========================================================
-  sbom:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: snyk/actions/setup@master
-
-      # SBOM生成
-      - run: snyk sbom --format=cyclonedx1.6+json --json-file-output=sbom.json
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: sbom
-          path: sbom.json
