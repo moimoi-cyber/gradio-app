@@ -203,7 +203,7 @@ jobs:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: >
           snyk sbom
-          --format=cyclonedx+json
+          --format=cyclonedx1.6+json
           --json-file-output=sbom.json
 
       - uses: actions/upload-artifact@v4
