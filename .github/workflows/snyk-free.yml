@@ -38,22 +38,6 @@ jobs:
           # echo "### List .github/workflows"
           # ls -al .github/workflows || true
 
-      # ▼▼▼ Debug: requirements.txt の存在と中身を確認（直下にある場合のみ） ▼▼▼
-      - name: "Debug: Show requirements.txt content"
-        if: ${{ hashFiles('requirements.txt') != '' }}
-        run: |
-          echo "### requirements.txt content"
-          echo "----- BEGIN requirements.txt -----"
-          cat requirements.txt
-          echo "-----  END requirements.txt  -----"
-
-      # （任意）requirements.txt が無い場合のメッセージ
-      - name: "Debug: requirements.txt not found"
-        if: ${{ hashFiles('requirements.txt') == '' }}
-        run: |
-          echo "requirements.txt が見つかりません（リポジトリ直下を想定）。"
-          echo "ファイルの配置または working-directory の指定を確認してください。"
-
       - name: Run Snyk to check for vulnerabilities
         uses: snyk/actions/python@master
         # requirements.txt が直下にある時だけ実行（無ければ自動スキップ） 
@@ -197,22 +181,6 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
-      # ▼▼▼ Debug: requirements.txt の存在と中身を確認（直下にある場合のみ） ▼▼▼
-      - name: "Debug: Show requirements.txt content"
-        if: ${{ hashFiles('requirements.txt') != '' }}
-        run: |
-          echo "### requirements.txt content"
-          echo "----- BEGIN requirements.txt -----"
-          cat requirements.txt
-          echo "-----  END requirements.txt  -----"
-
-      # （任意）requirements.txt が無い場合のメッセージ
-      - name: "Debug: requirements.txt not found"
-        if: ${{ hashFiles('requirements.txt') == '' }}
-        run: |
-          echo "requirements.txt が見つかりません（リポジトリ直下を想定）。"
-          echo "ファイルの配置または working-directory の指定を確認してください。"
-
       # 直下に requirements.txt がある場合は依存を明示的にインストール
       - name: Install app dependencies (requirements.txt)
         if: ${{ hashFiles('requirements.txt') != '' }}
@@ -220,14 +188,14 @@ jobs:
           python -m pip install --upgrade pip setuptools wheel
           pip install -r requirements.txt
 
-      #- name: Generate SBOM (CycloneDX JSON via Snyk CLI)
-      #  if: ${{ hashFiles('requirements.txt') != '' }}
-      #  env:
-      #    SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-      #  run: >
-      #    snyk sbom
-      #    --format=cyclonedx1.6+json
-      #    --json-file-output=sbom.json
+      - name: Generate SBOM (CycloneDX JSON via Snyk CLI)
+        if: ${{ hashFiles('requirements.txt') != '' }}
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: >
+          snyk sbom
+          --format=cyclonedx1.6+json
+          --json-file-output=sbom.json
       
       - name: Create dummy SBOM (for dry-run)
         run: echo '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1}' > sbom.json
