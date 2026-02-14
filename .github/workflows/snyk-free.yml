@@ -21,29 +21,57 @@ jobs:
   #    - requirements.txt が直下にある場合のみ自動で依存取得→SCAスキャン
   #    - Freeでも試せる（各製品の月間テスト上限あり） https://snyk.io/plans/  [6](https://github.com/garethr/snyk-sbom-examples?search=1)
   # ==========================================================
-  oss:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4   # リポジトリのコードを取得
 
-      - name: Run Snyk to check for vulnerabilities
-        uses: snyk/actions/python@master
-        # requirements.txt が直下にある時だけ実行（無ければ自動スキップ） 
-        if: ${{ hashFiles('requirements.txt') != '' }}
-        continue-on-error: true       # スキャン失敗時でも後続（SARIFアップロード）を止めない
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          # High以上の脆弱性を検知した場合にPRを止める設定（任意）
-          # （明示したい場合のみ）--file=requirements.txt を追加してもOK
-          args: --severity-threshold=high --sarif-file-output=snyk-oss.sarif
+oss:
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v4   # リポジトリのコードを取得
+    - name: Debug: Show current directory and list files
+      run: |
+        echo "### Current directory (pwd)"
+        pwd
+        echo
+        echo "### List files (ls -al .)"
+        ls -al .
+        echo
+        # 必要に応じてサブディレクトリも表示したい場合は以下をアンコメント
+        # echo "### List .github/workflows"
+        # ls -al .github/workflows || true
 
-      - uses: github/codeql-action/upload-sarif@v4
-        if: ${{ hashFiles('requirements.txt') != '' }}
-        with:
-          sarif_file: snyk-oss.sarif
-          category: snyk-sca   # 結果分類のためのラベル
-          # 公開Repoは無料でSecurityタブに反映。私有RepoはCode Security有効化等の前提あり（GitHub Docs参照）  [5](https://docs.snyk.io/snyk-api/reference/sbom)
+    # ▼▼▼ Debug: requirements.txt の存在と中身を確認（直下にある場合のみ） ▼▼▼
+    - name: "Debug: Show requirements.txt content"
+      if: ${{ hashFiles('requirements.txt') != '' }}
+      run: |
+        echo "### requirements.txt content"
+        echo "----- BEGIN requirements.txt -----"
+        cat requirements.txt
+        echo "-----  END requirements.txt  -----"
+
+    # （任意）requirements.txt が無い場合のメッセージ
+    - name: "Debug: requirements.txt not found"
+      if: ${{ hashFiles('requirements.txt') == '' }}
+      run: |
+        echo "requirements.txt が見つかりません（リポジトリ直下を想定）。"
+        echo "ファイルの配置または working-directory の指定を確認してください。"
+
+    - name: Run Snyk to check for vulnerabilities
+      uses: snyk/actions/python@master
+      # requirements.txt が直下にある時だけ実行（無ければ自動スキップ） 
+      if: ${{ hashFiles('requirements.txt') != '' }}
+      continue-on-error: true       # スキャン失敗時でも後続（SARIFアップロード）を止めない
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      with:
+        # High以上の脆弱性を検知した場合にPRを止める設定（任意）
+        # （明示したい場合のみ）--file=requirements.txt を追加してもOK
+        args: --severity-threshold=high --sarif-file-output=snyk-oss.sarif
+
+    - uses: github/codeql-action/upload-sarif@v4
+      if: ${{ hashFiles('requirements.txt') != '' }}
+      with:
+        sarif_file: snyk-oss.sarif
+        category: snyk-sca   # 結果分類のためのラベル
+        # 公開Repoは無料でSecurityタブに反映。私有RepoはCode Security有効化等の前提あり（GitHub Docs参照）  [5](https://docs.snyk.io/snyk-api/reference/sbom)
 
 
   # ==========================================================
