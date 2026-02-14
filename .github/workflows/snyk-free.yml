@@ -34,7 +34,7 @@ jobs:
         if: hashFiles('requirements*.txt') != ''
         run: pip install -r requirements.txt
 
-      - uses: snyk/actions/python@master
+      - uses: snyk/actions/python-3.10@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
