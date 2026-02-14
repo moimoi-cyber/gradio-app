@@ -16,26 +16,36 @@ permissions:
 
 jobs:
 
-  # ==========================================================
-  # 1) Snyk Open Source（SCA: ライブラリ脆弱性チェック）
-  # ==========================================================
-  oss:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4   # リポジトリのコードを取得
-
-      - uses: snyk/actions/python@master
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          # High以上の脆弱性はPRを停止
-          args: "--sarif-file-output=snyk-oss.sarif --severity-threshold=high"
-
-      - uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: snyk-oss.sarif
-          category: snyk-sca   # 結果分類のためのラベル
-
+ # ==========================================================
+ # 1) Snyk Open Source（SCA: ライブラリ脆弱性チェック）
+ # ==========================================================
+ oss:
+   runs-on: ubuntu-latest
+   steps:
+     - uses: actions/checkout@v4   # リポジトリのコードを取得
+ 
+     # Python 3.10 を使用し、pip キャッシュを有効化（Gradio想定）
+     - uses: actions/setup-python@v5
+       with:
+         python-version: "3.10"
+         cache: "pip"
+ 
+     # requirements.txt がある場合のみ依存をインストール
+     - name: Install dependencies (optional)
+       if: hashFiles('requirements*.txt') != ''
+       run: pip install -r requirements.txt
+ 
+     - uses: snyk/actions/python@master
+       env:
+         SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+       with:
+         # High以上の脆弱性はPRを停止
+         args: "--sarif-file-output=snyk-oss.sarif --severity-threshold=high"
+ 
+     - uses: github/codeql-action/upload-sarif@v4
+       with:
+         sarif_file: snyk-oss.sarif
+         category: snyk-sca   # 結果分類のためのラベル
 
   # ==========================================================
   # 2) Snyk Code（SAST: ソースコードの脆弱性チェック）
