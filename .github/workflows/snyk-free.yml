@@ -197,6 +197,13 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
+      # 直下に requirements.txt がある場合は依存を明示的にインストール
+      - name: Install app dependencies (requirements.txt)
+        if: ${{ hashFiles('requirements.txt') != '' }}
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -r requirements.
+
       - name: Generate SBOM (CycloneDX JSON via Snyk CLI)
         if: ${{ hashFiles('requirements.txt') != '' }}
         env:
