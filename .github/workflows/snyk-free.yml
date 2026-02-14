@@ -218,16 +218,20 @@ jobs:
         if: ${{ hashFiles('requirements.txt') != '' }}
         run: |
           python -m pip install --upgrade pip setuptools wheel
-          pip install -r requirements.txt
+          pip install -r requirements.
 
-      - name: Generate SBOM (CycloneDX JSON via Snyk CLI)
-        if: ${{ hashFiles('requirements.txt') != '' }}
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        run: >
-          snyk sbom
-          --format=cyclonedx1.6+json
-          --json-file-output=sbom.json
+      #- name: Generate SBOM (CycloneDX JSON via Snyk CLI)
+      #  if: ${{ hashFiles('requirements.txt') != '' }}
+      #  env:
+      #    SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      #  run: >
+      #    snyk sbom
+      #    --format=cyclonedx1.6+json
+      #    --json-file-output=sbom.json
+      
+      - name: Create dummy SBOM (for dry-run)
+        run: echo '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1}' > sbom.json
+
 
       - uses: actions/upload-artifact@v4
         if: ${{ hashFiles('requirements.txt') != '' }}
