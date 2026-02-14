@@ -95,9 +95,10 @@ jobs:
         continue-on-error: true           # 失敗しても後続（SARIFアップロード）を止めない
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        
+        # High以上の脆弱性を検知した場合にPRを止める設定（任意）
         run: >
           snyk code test
-          # High以上の脆弱性を検知した場合にPRを止める設定（任意）
           --severity-threshold=high
           --sarif-file-output=snyk-code.sarif
 
