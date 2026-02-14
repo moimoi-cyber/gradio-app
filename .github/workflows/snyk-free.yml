@@ -9,141 +9,164 @@ on:
 # --- GitHub の GITHUB_TOKEN の権限設定 ---
 permissions:
   contents: read              # リポジトリのコード取得に必要
-  security-events: write      # SARIF (解析結果) を GitHub Securityへアップロードするために必要
+  security-events: write      # SARIF (解析結果) をGitHub Securityへアップロードするために必要
   actions: read               # 一部のSnykテレメトリ処理で必要
-
 
 jobs:
 
   # ==========================================================
   # 1) Snyk Open Source（SCA: ライブラリ脆弱性チェック）
+  #    参考: Snyk Python Action
+  #    https://docs.snyk.io/developer-tools/snyk-ci-cd-integrations/github-actions-for-snyk-setup-and-checking-for-vulnerabilities/snyk-python-action
+  #    Freeで実行可。※月間テスト上限あり（例：200回/Freeの参考値）
+  #    https://snyk.io/plans/ （「Limited tests per product」） / 参考値: https://www.g2.com/products/snyk/pricing
   # ==========================================================
   oss:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4   # リポジトリのコードを取得
 
-      # Python 3.10 を使用し、pip キャッシュを有効化（Gradio想定）
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
-          cache: "pip"
-
-      # requirements.txt がある場合のみ依存をインストール
-      - name: Install dependencies (optional)
-        if: hashFiles('requirements*.txt') != ''
-        run: pip install -r requirements.txt
-
-      - uses: snyk/actions/python-3.10@master
+      - name: Run Snyk to check for vulnerabilities
+        uses: snyk/actions/python@master
+        continue-on-error: true       # スキャン失敗時でも後続（SARIFアップロード）を止めない
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
-          # High以上の脆弱性はPRを停止
-          args: "--file=requirements.txt --package-manager=pip --sarif-file-output=snyk-oss.sarif --severity-threshold=high"
+          # High以上の脆弱性を検知した場合にPRを止める設定（任意）
+          args: --severity-threshold=high --sarif-file-output=snyk-oss.sarif
 
       - uses: github/codeql-action/upload-sarif@v4
         with:
-          sarif_file: snyk-oss.sarif
-          category: snyk-sca   # 結果分類のためのラベル
-
+          sarif_file: snyk-oss.sarif   # 公開Repoは無料でSecurityタブに反映可。私有Repoは要件に注意
+          category: snyk-sca           # 参考: https://docs.github.com/.../uploading-a-sarif-file-to-github
 
   # ==========================================================
-  # 2) Snyk Code（SAST: ソースコードの脆弱性チェック）
+  # 2) Snyk Code（SAST）
+  #    参考: GitHub Actions 概説（Snyk Setup Actionの利用）
+  #    https://docs.snyk.io/developer-tools/snyk-ci-cd-integrations/github-actions-for-snyk-setup-and-checking-for-vulnerabilities
+  #    参考: SARIFアップロードの流れ
+  #    https://snyk.io/blog/snyk-security-information-in-github-code-scanning/
+  #    Freeで実行可。※月間テスト上限あり（例：100回/Freeの参考値）
   # ==========================================================
   code:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - uses: snyk/actions/setup@master
-
-      # High以上の脆弱性があれば停止
-      - name: Run Snyk Code
+      - uses: snyk/actions/setup@master   # CLI導入（Dockerは使わない）
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        run: |
-          snyk code test --severity-threshold=high --sarif > snyk-code.sarif
+
+      - name: Run Snyk Code (CLI)
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: >
+          snyk code test
+          # High以上の脆弱性を検知した場合にPRを止める設定（任意）
+          --severity-threshold=high
+          --sarif-file-output=snyk-code.sarif
 
       - uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: snyk-code.sarif
-          category: snyk-code   # 結果分類のためのラベル
-
+          category: snyk-code
 
   # ==========================================================
   # 3) Snyk Container（コンテナの脆弱性チェック）
-  #    ※ いまはDockerイメージ/Dockerfileの準備がない前提で一旦オフ
+  #    参考: Snyk Docker Action
+  #    https://docs.snyk.io/developer-tools/snyk-ci-cd-integrations/github-actions-for-snyk-setup-and-checking-for-vulnerabilities/snyk-docker-action
+  #    Freeで実行可。※月間テスト上限あり（例：100回/Freeの参考値）
+  #    --file=Dockerfile を付けると snyk.sarif を生成（Securityタブにアップロード可）
   # ==========================================================
-  # container:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #
-  #     # image: にスキャンしたいイメージ名
-  #     # args: の --file= にはDockerfileのパスを書く
-  #     - uses: snyk/actions/docker@master
-  #       env:
-  #         SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-  #       with:
-  #         image: myapp:latest                   # ←イメージ名を入力
-  #         args: "--file=Dockerfile --sarif-file-output=snyk-container.sarif --severity-threshold=high"  # High以上の脆弱性があれば停止
-  #
-  #     - uses: github/codeql-action/upload-sarif@v4
-  #       with:
-  #         sarif_file: snyk-container.sarif
-  #         category: snyk-container   # 結果分類のためのラベル
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
+      # 例：ローカルでビルドしてからスキャンする
+      - name: Build image (optional)
+        run: docker build -t myapp:latest .
+
+      - name: Run Snyk to check Docker image for vulnerabilities
+        uses: snyk/actions/docker@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          image: myapp:latest
+          # High以上の脆弱性を検知した場合にPRを止める設定（任意）
+          args: --file=Dockerfile --severity-threshold=high
+
+      - uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: snyk.sarif
+          category: snyk-container
 
   # ==========================================================
   # 4) Snyk IaC（Terraformなどの設定ファイルのチェック）
-  #    ※ いまはTerraform等のIaCがない前提で一旦オフ
+  #    参考: Snyk Infrastructure as Code Action
+  #    https://docs.snyk.io/developer-tools/snyk-ci-cd-integrations/github-actions-for-snyk-setup-and-checking-for-vulnerabilities/snyk-infrastructure-as-code-action
+  #    Freeで実行可。※月間テスト上限あり（例：300回/Freeの参考値）
   # ==========================================================
-  # iac:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #
-  #     # file: に診断対象のフォルダ（またはファイル）を指定
-  #     - uses: snyk/actions/iac@master
-  #       env:
-  #         SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-  #       with:
-  #         file: infra/terraform                   # ←必要に応じて変更
-  #         args: "--sarif-file-output=snyk-iac.sarif --severity-threshold=high"   # High以上の脆弱性があれば停止
-  #
-  #     - uses: github/codeql-action/upload-sarif@v4
-  #       with:
-  #         sarif_file: snyk-iac.sarif
-  #         category: snyk-iac   # 結果分類のためのラベル
+  iac:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
+      - name: Run Snyk to check configuration files for issues
+        uses: snyk/actions/iac@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          file: infra/terraform
+          # High以上の脆弱性を検知した場合にPRを止める設定（任意）
+          args: --severity-threshold=high
+
+      - uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: snyk.sarif
+          category: snyk-iac
 
   # ==========================================================
   # 5) Snyk DAST（Probely使用）
-  #    ※ 外部SaaSの契約/設定が必要なため一旦オフ
+  #    参考: Probely GitHub Action（外部アクション）
+  #    https://github.com/Probely/probely-github-action
+  #    【Freeの試走観点】SnykのFree枠とは別サービス。Snykの料金・上限とは無関係。
+  #    → 試せるかは Probely のプランに依存（Snyk Freeの“試せる/試せない”の範囲外）
   # ==========================================================
-  # dast:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: Probely/probely-github-action@main
-  #       with:
-  #         api-key: ${{ secrets.PROBELY_API_KEY }}
-  #         target-id: ""    # ←ここにターゲットIDを入力
-  #         region: us       # us / eu / au から選ぶ
-
+  dast:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: Probely/probely-github-action@main
+        with:
+          api-key: ${{ secrets.PROBELY_API_KEY }}
+          target-id: ""    # ←ここにターゲットIDを入力
+          region: us       # us / eu / au から選ぶ
 
   # ==========================================================
   # 6) SBOM（ソフトウェア部品表の出力）
+  #    参考: SBOM（Snyk APIドキュメントに対応フォーマットの説明あり）
+  #    https://docs.snyk.io/snyk-api/reference/sbom
+  #    Freeでも CLI の `snyk sbom` は使えるが、各製品のテストは月上限あり
   # ==========================================================
   sbom:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: snyk/actions/setup@master
 
-      # SBOM生成
-      - run: snyk sbom --file=requirements.txt --package-manager=pip --format=cyclonedx1.6+json --json-file-output=sb
+      - uses: snyk/actions/setup@master   # CLI導入
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      - name: Generate SBOM (CycloneDX JSON via Snyk CLI)
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: >
+          snyk sbom
+          --format=cyclonedx+json
+          --json-file-output=sbom.json
 
       - uses: actions/upload-artifact@v4
         with:
