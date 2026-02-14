@@ -18,8 +18,8 @@ jobs:
   # 1) Snyk Open Source（SCA: ライブラリ脆弱性チェック）
   #    参考: Snyk Python Action
   #    https://docs.snyk.io/developer-tools/snyk-ci-cd-integrations/github-actions-for-snyk-setup-and-checking-for-vulnerabilities/snyk-python-action
-  #    Freeで実行可。※月間テスト上限あり（例：200回/Freeの参考値）
-  #    https://snyk.io/plans/ （「Limited tests per product」） / 参考値: https://www.g2.com/products/snyk/pricing
+  #    Freeで実行可。※月間テスト上限あり（Snyk Freeは「Limited tests per product」）
+  #    https://snyk.io/plans/（プラン表）、参考値: https://www.g2.com/products/snyk/pricing
   # ==========================================================
   oss:
     runs-on: ubuntu-latest
@@ -46,7 +46,7 @@ jobs:
   #    https://docs.snyk.io/developer-tools/snyk-ci-cd-integrations/github-actions-for-snyk-setup-and-checking-for-vulnerabilities
   #    参考: SARIFアップロードの流れ
   #    https://snyk.io/blog/snyk-security-information-in-github-code-scanning/
-  #    Freeで実行可。※月間テスト上限あり（例：100回/Freeの参考値）
+  #    Freeで実行可。※月間テスト上限あり
   # ==========================================================
   code:
     runs-on: ubuntu-latest
@@ -76,7 +76,7 @@ jobs:
   # 3) Snyk Container（コンテナの脆弱性チェック）
   #    参考: Snyk Docker Action
   #    https://docs.snyk.io/developer-tools/snyk-ci-cd-integrations/github-actions-for-snyk-setup-and-checking-for-vulnerabilities/snyk-docker-action
-  #    Freeで実行可。※月間テスト上限あり（例：100回/Freeの参考値）
+  #    Freeで実行可。※月間テスト上限あり
   #    --file=Dockerfile を付けると snyk.sarif を生成（Securityタブにアップロード可）
   # ==========================================================
   container:
@@ -107,7 +107,7 @@ jobs:
   # 4) Snyk IaC（Terraformなどの設定ファイルのチェック）
   #    参考: Snyk Infrastructure as Code Action
   #    https://docs.snyk.io/developer-tools/snyk-ci-cd-integrations/github-actions-for-snyk-setup-and-checking-for-vulnerabilities/snyk-infrastructure-as-code-action
-  #    Freeで実行可。※月間テスト上限あり（例：300回/Freeの参考値）
+  #    Freeで実行可。※月間テスト上限あり
   # ==========================================================
   iac:
     runs-on: ubuntu-latest
@@ -133,23 +133,23 @@ jobs:
   # 5) Snyk DAST（Probely使用）
   #    参考: Probely GitHub Action（外部アクション）
   #    https://github.com/Probely/probely-github-action
-  #    【Freeの試走観点】SnykのFree枠とは別サービス。Snykの料金・上限とは無関係。
-  #    → 試せるかは Probely のプランに依存（Snyk Freeの“試せる/試せない”の範囲外）
+  #    【Snyk Freeでは試せない】…ProbelyはSnykとは別サービスのため、Snyk Freeの範囲外
+  #    → 試す場合はProbely側のプラン・APIキー準備が必要
   # ==========================================================
-  dast:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: Probely/probely-github-action@main
-        with:
-          api-key: ${{ secrets.PROBELY_API_KEY }}
-          target-id: ""    # ←ここにターゲットIDを入力
-          region: us       # us / eu / au から選ぶ
+  # dast:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: Probely/probely-github-action@main
+  #       with:
+  #         api-key: ${{ secrets.PROBELY_API_KEY }}
+  #         target-id: ""    # ←ここにターゲットIDを入力
+  #         region: us       # us / eu / au から選ぶ
 
   # ==========================================================
   # 6) SBOM（ソフトウェア部品表の出力）
   #    参考: SBOM（Snyk APIドキュメントに対応フォーマットの説明あり）
   #    https://docs.snyk.io/snyk-api/reference/sbom
-  #    Freeでも CLI の `snyk sbom` は使えるが、各製品のテストは月上限あり
+  #    Freeでも CLI の `snyk sbom` は実行可（ただし各製品のテストは月上限あり）
   # ==========================================================
   sbom:
     runs-on: ubuntu-latest
