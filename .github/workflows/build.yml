@@ -1,0 +1,38 @@
+name: SonarCloud (Python / Free / no-build)
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+
+jobs:
+  sonarcloud:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read        # 解析に必要（リポジトリ内容の参照）
+      pull-requests: read   # PRデコレーション用（Freeで利用可）
+      checks: write         # GitHub Checks 連携の安定化に推奨（必要に応じて調整）
+
+    steps:
+      # リポジトリ取得（浅いクローンを避ける：関連性分析の精度向上）
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 履歴がある方が差分・PR解析が安定
+
+      # ==========================================================
+      # SonarCloud スキャン（Free版の基本：品質＋SAST）
+      #  - 推奨アクション: sonarsource/sonarqube-scan-action（現行 v7 系）
+      #  - sonar-project.properties を使わない場合は args に主要設定を書く
+      # ==========================================================
+      - name: SonarCloud Scan
+        uses: sonarsource/sonarqube-scan-action@v7
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}   # SonarCloud のトークン（Secrets に保存）
+        with:
+          args: >
+            # ▼ SonarCloud の Organization Key
+            -Dsonar.organization=moimoi-cyber
+            # ▼ SonarCloud の Project Key
+            -Dsonar.projectKey=moimoi-cyber_gradio-app
+            # ▼ 解析対象パス：リポジトリ全体なら "."
+            -Dsonar.sources=.
