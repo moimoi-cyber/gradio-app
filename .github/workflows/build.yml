@@ -30,9 +30,6 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}   # SonarCloud のトークン（Secrets に保存）
         with:
           args: >
-            # ▼ SonarCloud の Organization Key
             -Dsonar.organization=moimoi-cyber
-            # ▼ SonarCloud の Project Key
             -Dsonar.projectKey=moimoi-cyber_gradio-app
-            # ▼ 解析対象パス：リポジトリ全体なら "."
             -Dsonar.sources=.
