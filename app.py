@@ -1,27 +1,8 @@
-import gradio as gr
-import subprocess
-import sys
 
-def greet(name, intensity):
-    # コマンドインジェクションの例：
-    subprocess.run(f"echo {name}", shell=True)
-    return "Hello, " + name + "!" * int(intensity)
+# security/insecure_cli_only.py
+# !!! TEST ONLY: SAST 検証用の故意の脆弱コード。merge禁止 !!!
+import sys, subprocess
 
-def main():
-    # Gradio画面のテキストボックスに入れた内容が、そのまま greet() の name に入る。
-    demo = gr.Interface(
-        fn=greet,
-        inputs=["text", "slider"],
-        outputs=["text"],
-        api_name="predict"
-    )
-
-    # 引数が1つ以上あれば、その最初の引数をnameとしてコマンドに流し込む。
-    if len(sys.argv) > 1:
-        name = sys.argv[1]
-        subprocess.run(f"echo {name}", shell=True)
-
-    demo.launch()
-
-if __name__ == "__main__":
-    main()
+if len(sys.argv) > 1:
+    user_input = sys.argv[1]
+    subprocess.run(f"echo {user_input}", shell=True)  # CWE-78: OS Command Injection
